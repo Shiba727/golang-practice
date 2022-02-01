@@ -11,9 +11,11 @@ FROM base AS unit-test
 RUN go test -v .
 
 FROM base AS build
-ARG TARGETOS
-ARG TARGETARCH
-ENV HTTP_PORT=8080
 RUN cd ./main && go build -o /urlshortner
+
+FROM gcr.io/distroless/base-debian10
+ENV HTTP_PORT=8080
+WORKDIR /
+COPY --from=build /urlshortner /urlshortner
 EXPOSE 8080
-CMD [ "/urlshortner" ]
+ENTRYPOINT ["/urlshortner"]
