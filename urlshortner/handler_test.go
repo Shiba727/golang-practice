@@ -19,7 +19,7 @@ func TestParseYAML(t *testing.T) {
     path: /test456
       url: http://test456
     `
-	expected := []pathUrl{
+	expected := []PathUrl{
 		{
 			URL:  "http://test123",
 			Path: "/test123",

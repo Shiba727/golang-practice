@@ -7,7 +7,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type pathUrl struct {
+type PathUrl struct {
+	ID   int    `yaml:"id,omitempty"`
 	URL  string `yaml:"url,omitempty"`
 	Path string `yaml:"path,omitempty"`
 }
@@ -26,7 +27,6 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 			http.Redirect(w, r, dest, http.StatusFound)
 			return
 		}
-
 		fallback.ServeHTTP(w, r)
 	}
 }
@@ -56,16 +56,25 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	return MapHandler(pathMap, fallback), nil
 }
 
-func parseYAML(data []byte) ([]pathUrl, error) {
-	var pathUrls []pathUrl
+func parseYAML(data []byte) ([]PathUrl, error) {
+	var pathUrls []PathUrl
 	err := yaml.Unmarshal(data, &pathUrls)
 	return pathUrls, err
 }
 
-func buildMap(pathUrls []pathUrl) map[string]string {
+func buildMap(pathUrls []PathUrl) map[string]string {
 	pathMap := make(map[string]string, len(pathUrls))
 	for _, p := range pathUrls {
 		pathMap[p.Path] = p.URL
 	}
 	return pathMap
+}
+
+func DBHandler(fallback http.Handler) (http.HandlerFunc, error) {
+	pathURLs, err := FetchCurrentPathFromDB()
+	if err != nil {
+		log.Fatal("Failed to fetch current matches from DB ", err)
+	}
+	pathMap := buildMap(pathURLs)
+	return MapHandler(pathMap, fallback), nil
 }
