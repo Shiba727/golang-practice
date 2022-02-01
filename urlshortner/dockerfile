@@ -9,6 +9,7 @@ COPY . .
 
 FROM base AS unit-test
 RUN go test -v .
+RUN go vet -v
 
 FROM base AS build
 RUN cd ./main && go build -o /urlshortner
