@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	urlshort "urlshortner"
 )
 
 func main() {
+	listenAddr := os.Getenv("HTTP_PORT")
 	mux := defaultMux()
 
 	// Build the MapHandler using the mux as the fallback
@@ -28,8 +30,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Starting the server on :8080")
-	http.ListenAndServe(":8080", yamlHandler)
+	fmt.Printf("Starting the server on :%s", listenAddr)
+	http.ListenAndServe(":"+listenAddr, yamlHandler)
 }
 
 func defaultMux() *http.ServeMux {
