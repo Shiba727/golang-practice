@@ -7,9 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
+	"regexp"
 )
 
 type matchResult struct {
@@ -18,13 +16,23 @@ type matchResult struct {
 	ext   string
 }
 
-func main() {
-	toRename := make(map[string][]string)
-	var walkDir string
-	var dryrun bool
+var (
+	re            = regexp.MustCompile("^(.+?) ([0-9]{4}) [(]([0-9]+) of ([0-9]+)[)][.](.+?)$")
+	replaceString = "$2 - $1 - $3 of $4.$5"
+	walkDir       string
+	dryrun        bool
+)
+
+func init() {
 	flag.StringVar(&walkDir, "walkdir", "sample", "the directory where you save all the files that need to rename")
 	flag.BoolVar(&dryrun, "dry", true, "whether or not should the tool change the names")
+}
+
+func main() {
 	flag.Parse()
+
+	// toRename := make(map[string][]string)
+	var toRename []string
 
 	err := filepath.Walk(walkDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -33,10 +41,8 @@ func main() {
 		if info.IsDir() {
 			return nil
 		}
-		if res, err := match(info.Name()); err == nil {
-			curDir := filepath.Dir(path)
-			key := filepath.Join(curDir, fmt.Sprintf("%s.%s", res.base, res.ext))
-			toRename[key] = append(toRename[key], info.Name())
+		if _, err := match(info.Name()); err == nil {
+			toRename = append(toRename, path)
 		}
 		return nil
 	})
@@ -44,42 +50,26 @@ func main() {
 		log.Fatal("Failed to walk through the dir", walkDir)
 	}
 
-	for key, files := range toRename {
-		dir := filepath.Dir(key)
-		count := len(files)
-		sort.Strings(files)
-		for i, filename := range files {
+	for _, path := range toRename {
+		dir := filepath.Dir(path)
+		filename := filepath.Base(path)
+		newFilename, _ := match(filename)
+		newPath := filepath.Join(dir, newFilename)
 
-			res, err := match(filename)
+		fmt.Printf("mv %s => %s\n", path, newPath)
+		if !dryrun {
+			err = os.Rename(path, newPath)
 			if err != nil {
-				log.Fatal("no match", err)
-			}
-
-			newName := fmt.Sprintf("%s-%d of %d.%s", res.base, (i + 1), count, res.ext)
-			newPath := filepath.Join(dir, newName)
-			oldPath := filepath.Join(dir, filename)
-
-			fmt.Printf("mv %s => %s\n", oldPath, newPath)
-			if !dryrun {
-				err = os.Rename(oldPath, newPath)
-				if err != nil {
-					log.Fatal("failed to rename", err)
-				}
+				log.Fatal("failed to rename", err)
 			}
 		}
 	}
 }
 
 //match returns the new file name, or an error if the file name did't match our pattern.
-func match(filename string) (*matchResult, error) {
-	pieces := strings.Split(filename, ".")
-	ext := pieces[len(pieces)-1]
-	tmp := strings.Join(pieces[0:len(pieces)-1], ".")
-	pieces = strings.Split(tmp, "_")
-	name := strings.Join(pieces[0:len(pieces)-1], "_")
-	number, err := strconv.Atoi(pieces[len(pieces)-1])
-	if err != nil {
-		return nil, fmt.Errorf("%s did not match our pattern", filename)
+func match(filename string) (string, error) {
+	if !re.MatchString(filename) {
+		return "", fmt.Errorf("%s did not match our pattern", filename)
 	}
-	return &matchResult{strings.Title(name), number, ext}, nil
+	return re.ReplaceAllString(filename, replaceString), nil
 }
